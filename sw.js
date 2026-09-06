@@ -1,4 +1,4 @@
-const CACHE_NAME = "shawarma-sales-v2";
+const CACHE_NAME = "shawarma-sales-v3";
 
 const APP_FILES = [
     "./",
@@ -16,11 +16,10 @@ self.addEventListener("install", (event) => {
         })
     );
 
-    // Activate immediately
     self.skipWaiting();
 });
 
-// Delete old caches
+// Activate new service worker and remove old caches
 self.addEventListener("activate", (event) => {
     event.waitUntil(
         caches.keys().then((cacheNames) => {
@@ -43,7 +42,7 @@ self.addEventListener("fetch", (event) => {
 
     const requestURL = new URL(event.request.url);
 
-    // Always get the latest index.html from GitHub Pages
+    // Always try to get the newest index.html
     if (
         requestURL.origin === self.location.origin &&
         (
