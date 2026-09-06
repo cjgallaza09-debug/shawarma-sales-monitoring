@@ -341,6 +341,10 @@ td:first-child {
         color: black;
     }
 }
+
+/* V2 FEATURES */
+.v2-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.v2-stat{background:#f6f6f6;padding:16px;border-radius:8px}.v2-stat span{display:block;color:#666;font-size:13px}.v2-stat b{display:block;font-size:21px;margin-top:6px}.v2-filters{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;align-items:end}.v2-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}.v2-tab{background:#ddd}.v2-tab.active{background:#222;color:#fff}.v2-section{display:none}.v2-section.active{display:block}.v2-alert{padding:12px;border-radius:8px;margin:8px 0;background:#fff3cd}.v2-badge{display:inline-block;padding:4px 8px;border-radius:12px;background:#eee;font-size:12px}.v2-badge.admin{background:#222;color:#fff}.v2-badge.staff{background:#ddd}
+@media(max-width:900px){.v2-grid,.v2-filters{grid-template-columns:1fr 1fr}}@media(max-width:600px){.v2-grid,.v2-filters{grid-template-columns:1fr}}
 </style>
 
 <meta name="theme-color" content="#111111">
@@ -892,6 +896,51 @@ td:first-child {
 
 </div>
 
+
+
+<!-- ================= V2 FEATURES ================= -->
+<div class="panel">
+<h2>Management Center</h2>
+<div class="v2-tabs">
+<button class="v2-tab active" data-v2="v2dash">📊 Analytics</button>
+<button class="v2-tab" data-v2="v2expense">🧾 Expenses</button>
+<button class="v2-tab" data-v2="v2movement">📦 Stock Movements</button>
+<button class="v2-tab" data-v2="v2users">👥 Users</button>
+</div>
+<section id="v2dash" class="v2-section active">
+<div class="v2-grid">
+<div class="v2-stat"><span>Month Sales</span><b id="v2MonthSales">₱0.00</b></div>
+<div class="v2-stat"><span>Month Expenses</span><b id="v2MonthExpenses">₱0.00</b></div>
+<div class="v2-stat"><span>Month Net</span><b id="v2MonthNet">₱0.00</b></div>
+<div class="v2-stat"><span>Best Sales Day</span><b id="v2BestDay">-</b></div>
+<div class="v2-stat"><span>Low Stock</span><b id="v2LowStock">0</b></div>
+<div class="v2-stat"><span>Out of Stock</span><b id="v2OutStock">0</b></div>
+<div class="v2-stat"><span>Expense Entries</span><b id="v2ExpenseCount">0</b></div>
+<div class="v2-stat"><span>Logged-in Role</span><b id="v2Role">STAFF</b></div>
+</div>
+<div id="v2Alerts"></div>
+</section>
+<section id="v2expense" class="v2-section">
+<div class="form-grid">
+<div class="field"><label>Date</label><input type="date" id="v2ExpenseDate"></div>
+<div class="field"><label>Category</label><select id="v2ExpenseCategory"><option>Ingredients</option><option>Supplies</option><option>Transportation</option><option>Utilities</option><option>Staff</option><option>Equipment</option><option>Other</option></select></div>
+<div class="field"><label>Description</label><input id="v2ExpenseDescription" placeholder="Example: Meat supply"></div>
+<div class="field"><label>Amount</label><input type="number" id="v2ExpenseAmount" min="0" step="0.01" placeholder="0.00"></div>
+</div>
+<div class="actions"><button class="primary" onclick="v2SaveExpense()">Add Expense</button><button class="gray" onclick="v2ClearExpense()">Clear</button><button class="green" onclick="v2ExportExpenses()">Export Expenses</button></div>
+<br><div class="v2-filters"><div class="field"><label>Month</label><input type="month" id="v2ExpenseMonth"></div><div class="field"><label>Category</label><select id="v2ExpenseFilter"><option value="">All</option><option>Ingredients</option><option>Supplies</option><option>Transportation</option><option>Utilities</option><option>Staff</option><option>Equipment</option><option>Other</option></select></div><div></div><div></div></div>
+<br><div style="overflow-x:auto"><table><thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th>User</th><th>Action</th></tr></thead><tbody id="v2ExpenseTable"></tbody></table></div>
+</section>
+<section id="v2movement" class="v2-section">
+<p class="note">Every stock adjustment made through this version is recorded here.</p>
+<div style="overflow-x:auto"><table><thead><tr><th>Date/Time</th><th>Item</th><th>Type</th><th>Change</th><th>New Quantity</th><th>User</th></tr></thead><tbody id="v2MovementTable"></tbody></table></div>
+</section>
+<section id="v2users" class="v2-section">
+<p class="note">Registered users are managed through Supabase Authentication. Roles are stored in the profiles table.</p>
+<div style="overflow-x:auto"><table><thead><tr><th>Email</th><th>Role</th><th>Created</th><th>Action</th></tr></thead><tbody id="v2UserTable"></tbody></table></div>
+</section>
+</div>
+</div>
 
 <!-- PRINT AREA -->
 
@@ -2150,6 +2199,7 @@ supabaseClient.auth.onAuthStateChange(function(event, session) {
     if (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") handleAuthSession(session);
 });
 
+\n/* ================= V2 JAVASCRIPT ================= */\nlet v2Expenses=[],v2Movements=[],v2Profiles=[],v2Role="staff",v2EditingExpense=null;\nconst v2Month=()=>new Date().toISOString().slice(0,7);\nasync function v2Load(){\n const [e,m,p]=await Promise.all([supabaseClient.from("expenses").select("*").order("expense_date",{ascending:false}),supabaseClient.from("stock_movements").select("*").order("created_at",{ascending:false}).limit(100),supabaseClient.from("profiles").select("*").order("created_at",{ascending:true})]);\n if(!e.error)v2Expenses=e.data||[];else console.warn("expenses",e.error.message);\n if(!m.error)v2Movements=m.data||[];else console.warn("stock_movements",m.error.message);\n if(!p.error)v2Profiles=p.data||[];else console.warn("profiles",p.error.message);\n v2Render();\n}\nfunction v2Render(){\n const m=v2Month(),sr=salesRecords.filter(r=>r.date.startsWith(m)),ex=v2Expenses.filter(r=>r.expense_date.startsWith(m));\n const sales=sr.reduce((a,r)=>a+Number(r.total_sale||0),0),embedded=sr.reduce((a,r)=>a+Number(r.expenses||0)+Number(r.gcash_expenses||0),0),extra=ex.reduce((a,r)=>a+Number(r.amount||0),0);\n $("v2MonthSales").textContent=money(sales);$("v2MonthExpenses").textContent=money(embedded+extra);$("v2MonthNet").textContent=money(sales-embedded-extra);\n const best=sr.length?sr.reduce((a,b)=>b.totalSale>a.totalSale?b:a):null;$("v2BestDay").textContent=best?best.date:"-";\n $("v2LowStock").textContent=stocks.filter(s=>s.quantity>0&&s.quantity<=3).length;$("v2OutStock").textContent=stocks.filter(s=>s.quantity===0).length;$("v2ExpenseCount").textContent=v2Expenses.length;$("v2Role").textContent=v2Role.toUpperCase();\n const al=$("v2Alerts");al.innerHTML="";const out=stocks.filter(s=>s.quantity===0),low=stocks.filter(s=>s.quantity>0&&s.quantity<=3);if(out.length)al.innerHTML+='<div class="v2-alert"><b>⚠ Out of stock:</b> '+out.map(s=>esc(s.name)).join(', ')+'</div>';if(low.length)al.innerHTML+='<div class="v2-alert"><b>🔔 Low stock:</b> '+low.map(s=>esc(s.name)).join(', ')+'</div>';\n v2RenderExpenses();v2RenderMovements();v2RenderUsers();\n}\nasync function v2SaveExpense(){const d=$("v2ExpenseDate").value||today,c=$("v2ExpenseCategory").value,desc=$("v2ExpenseDescription").value.trim(),amt=parseFloat($("v2ExpenseAmount").value);if(!desc||isNaN(amt)||amt<=0){alert("Enter a valid expense description and amount.");return}const payload={expense_date:d,category:c,description:desc,amount:amt,added_by:currentUser.id};let q=v2EditingExpense?supabaseClient.from("expenses").update(payload).eq("id",v2EditingExpense):supabaseClient.from("expenses").insert(payload);const {error}=await q;if(error){alert(error.message);return}v2EditingExpense=null;v2ClearExpense();await v2Load();toast("Expense saved.")}\nfunction v2EditExpense(id){const r=v2Expenses.find(x=>x.id===id);if(!r)return;$("v2ExpenseDate").value=r.expense_date;$("v2ExpenseCategory").value=r.category;$("v2ExpenseDescription").value=r.description;$("v2ExpenseAmount").value=r.amount;v2EditingExpense=id}\nasync function v2DeleteExpense(id){if(v2Role!=="admin"){alert("Only an admin can delete expenses.");return}if(!confirm("Delete this expense?"))return;const {error}=await supabaseClient.from("expenses").delete().eq("id",id);if(error)alert(error.message);else{await v2Load();toast("Expense deleted.")}}\nfunction v2ClearExpense(){$("v2ExpenseDate").value=today;$("v2ExpenseCategory").selectedIndex=0;$("v2ExpenseDescription").value="";$("v2ExpenseAmount").value="";v2EditingExpense=null}\nfunction v2RenderExpenses(){let a=[...v2Expenses],m=$("v2ExpenseMonth").value,c=$("v2ExpenseFilter").value;if(m)a=a.filter(x=>x.expense_date.startsWith(m));if(c)a=a.filter(x=>x.category===c);const t=$("v2ExpenseTable");t.innerHTML=a.length?a.map(r=>`<tr><td>${r.expense_date}</td><td>${esc(r.category)}</td><td>${esc(r.description)}</td><td>${money(r.amount)}</td><td>${esc(r.added_by||"-")}</td><td><button class="blue" onclick="v2EditExpense(${r.id})">Edit</button> ${v2Role==="admin"?`<button class="red" onclick="v2DeleteExpense(${r.id})">Delete</button>`:""}</td></tr>`).join(""): '<tr><td colspan="6" class="empty">No expenses found.</td></tr>'}\nfunction v2RenderMovements(){const t=$("v2MovementTable");t.innerHTML=v2Movements.length?v2Movements.map(r=>`<tr><td>${new Date(r.created_at).toLocaleString()}</td><td>${esc(r.item_name)}</td><td>${esc(r.movement_type)}</td><td>${r.change_qty>0?"+":""}${r.change_qty}</td><td>${r.new_quantity}</td><td>${esc(r.created_by||"-")}</td></tr>`).join(""):'<tr><td colspan="6" class="empty">No stock movements yet.</td></tr>'}\nfunction v2RenderUsers(){const t=$("v2UserTable");if(v2Role!=="admin"){t.innerHTML='<tr><td colspan="4" class="empty">Admin access required.</td></tr>';return}t.innerHTML=v2Profiles.length?v2Profiles.map(p=>`<tr><td>${esc(p.email)}</td><td><span class="v2-badge ${p.role}">${esc(p.role)}</span></td><td>${new Date(p.created_at).toLocaleDateString()}</td><td>${p.id===currentUser.id?"Current user":`<select onchange="v2ChangeRole('${p.id}',this.value)"><option value="staff" ${p.role==='staff'?"selected":""}>Staff</option><option value="admin" ${p.role==='admin'?"selected":""}>Admin</option></select>`}</td></tr>`).join(""):'<tr><td colspan="4" class="empty">No profiles.</td></tr>'}\nasync function v2ChangeRole(id,role){if(v2Role!=="admin"||id===currentUser.id)return;const {error}=await supabaseClient.from("profiles").update({role}).eq("id",id);if(error)alert(error.message);else{await v2Load();toast("Role updated.")}}\nfunction v2ExportExpenses(){if(!v2Expenses.length){alert("No expenses.");return}const d=v2Expenses.map(x=>({Date:x.expense_date,Category:x.category,Description:x.description,Amount:x.amount,AddedBy:x.added_by})),w=XLSX.utils.book_new(),s=XLSX.utils.json_to_sheet(d);XLSX.utils.book_append_sheet(w,s,"Expenses");XLSX.writeFile(w,"Shawarma_Expenses.xlsx")}\nasync function v2RecordMovement(name,change,newQty,type){if(!currentUser)return;await supabaseClient.from("stock_movements").insert({item_name:name,change_qty:change,new_quantity:newQty,movement_type:type,created_by:currentUser.id})}\nconst v2OriginalUpdateStockQuantity=updateStockQuantity;updateStockQuantity=async function(index,value){const s=stocks[index];const old=s?s.quantity:0;await v2OriginalUpdateStockQuantity(index,value);const q=parseInt(value);if(s&&!isNaN(q)&&q>=0)await v2RecordMovement(s.name,q-old,q,"ADJUST");await v2Load()};\nconst v2OriginalAddStock=addStock;addStock=async function(){const before=stocks.map(s=>({id:s.id,name:s.name,quantity:s.quantity}));await v2OriginalAddStock();await v2Load();for(const s of stocks){const b=before.find(x=>x.id===s.id||x.name.toLowerCase()===s.name.toLowerCase());if(b&&b.quantity!==s.quantity)await v2RecordMovement(s.name,s.quantity-b.quantity,s.quantity,"UPDATE");if(!b)await v2RecordMovement(s.name,s.quantity,s.quantity,"ADD")}await v2Load()};\nconst v2OriginalHandleAuthSession=handleAuthSession;handleAuthSession=async function(session){await v2OriginalHandleAuthSession(session);if(currentUser){const {data}=await supabaseClient.from("profiles").select("role").eq("id",currentUser.id).maybeSingle();v2Role=data?.role||"staff";await v2Load();}};\ndocument.querySelectorAll(".v2-tab").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll(".v2-tab").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".v2-section").forEach(x=>x.classList.remove("active"));b.classList.add("active");$(b.dataset.v2).classList.add("active")}));$("v2ExpenseDate").value=today;$("v2ExpenseMonth").value=v2Month();$("v2ExpenseMonth").addEventListener("change",v2RenderExpenses);$("v2ExpenseFilter").addEventListener("change",v2RenderExpenses);\n
 (async function startApp() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     await handleAuthSession(session);
@@ -2163,20 +2213,6 @@ setInterval(function() {
 </script>
 
 
-
-<script>
-if ("serviceWorker" in navigator) {
-    window.addEventListener("load", function () {
-        navigator.serviceWorker.register("./sw.js?v=2")
-            .then(function (registration) {
-                console.log("Service Worker registered successfully");
-                registration.update();
-            })
-            .catch(function (error) {
-                console.error("Service Worker registration failed:", error);
-            });
-    });
-}
-</script>
+<script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js?v=3").then(r=>r.update()).catch(console.warn));}</script>
 </body>
 </html>
