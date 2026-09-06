@@ -1,5 +1,98 @@
-const CACHE_NAME = "daily-sales-monitoring-v1";
-const APP_SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
-self.addEventListener("install", event => { event.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(APP_SHELL))); self.skipWaiting(); });
-self.addEventListener("activate", event => { event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))); self.clients.claim(); });
-self.addEventListener("fetch", event => { if (event.request.method !== "GET") return; event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request).then(response => { if (response.ok && new URL(event.request.url).origin === self.location.origin) { const copy=response.clone(); caches.open(CACHE_NAME).then(c=>c.put(event.request,copy)); } return response; }).catch(()=>caches.match("./index.html")))); });
+const CACHE_NAME = "shawarma-sales-v2";
+
+const APP_FILES = [
+    "./",
+    "./index.html",
+    "./manifest.webmanifest",
+    "./icon-192.png",
+    "./icon-512.png"
+];
+
+// Install new service worker
+self.addEventListener("install", (event) => {
+    event.waitUntil(
+        caches.open(CACHE_NAME).then((cache) => {
+            return cache.addAll(APP_FILES);
+        })
+    );
+
+    // Activate immediately
+    self.skipWaiting();
+});
+
+// Delete old caches
+self.addEventListener("activate", (event) => {
+    event.waitUntil(
+        caches.keys().then((cacheNames) => {
+            return Promise.all(
+                cacheNames
+                    .filter((name) => name !== CACHE_NAME)
+                    .map((name) => caches.delete(name))
+            );
+        })
+    );
+
+    self.clients.claim();
+});
+
+// Handle requests
+self.addEventListener("fetch", (event) => {
+    if (event.request.method !== "GET") {
+        return;
+    }
+
+    const requestURL = new URL(event.request.url);
+
+    // Always get the latest index.html from GitHub Pages
+    if (
+        requestURL.origin === self.location.origin &&
+        (
+            requestURL.pathname.endsWith("/") ||
+            requestURL.pathname.endsWith("/index.html")
+        )
+    ) {
+        event.respondWith(
+            fetch(event.request, {
+                cache: "no-store"
+            })
+            .then((response) => {
+                const copy = response.clone();
+
+                caches.open(CACHE_NAME).then((cache) => {
+                    cache.put(event.request, copy);
+                });
+
+                return response;
+            })
+            .catch(() => {
+                return caches.match(event.request);
+            })
+        );
+
+        return;
+    }
+
+    // Other files: cache first, then network
+    event.respondWith(
+        caches.match(event.request).then((cachedResponse) => {
+            if (cachedResponse) {
+                return cachedResponse;
+            }
+
+            return fetch(event.request).then((response) => {
+                if (
+                    response.ok &&
+                    requestURL.origin === self.location.origin
+                ) {
+                    const copy = response.clone();
+
+                    caches.open(CACHE_NAME).then((cache) => {
+                        cache.put(event.request, copy);
+                    });
+                }
+
+                return response;
+            });
+        })
+    );
+});
